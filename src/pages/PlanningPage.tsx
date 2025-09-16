@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Grid, List } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Grid, List, CheckCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +12,13 @@ import TableView from '@/components/planning/TableView';
 import LoadingState from '@/components/planning/LoadingState';
 import FeaturesInfo from '@/components/planning/FeaturesInfo';
 import { AIPlanning, TournamentDetail, Match } from '@/types/planning';
-import { tournamentService, planningService } from '@/services/api';
+import { tournamentService, planningService, matchService } from '@/services/api';
 
 const PlanningPage = () => {
+  const navigate = useNavigate();
   const [selectedTournament, setSelectedTournament] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [generatedPlanning, setGeneratedPlanning] = useState<AIPlanning | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
@@ -34,30 +37,6 @@ const PlanningPage = () => {
     // Calculer la différence en millisecondes puis convertir en minutes
     const diffInMs = endDate.getTime() - startDate.getTime();
     return Math.floor(diffInMs / (1000 * 60));
-  };
-
-  const handleGeneratePlanning = async () => {
-    if (!selectedTournament) return;
-    
-    setIsGenerating(true);
-    const response = await planningService.generatePlanning(selectedTournament);
-    if (response.success) {
-      const planningObj = response.data["planning_data"]
-      planningObj["total_matches"] = response.data["total_matches"]
-      setGeneratedPlanning(planningObj)
-      const extractedMatches = getAllMatches(planningObj, selectedTournament, tournaments);
-      setMatches(extractedMatches);
-      setIsGenerating(false);
-      setShowPreview(true);
-    } else {
-      console.error(response.message);
-    }
-  };
-
-  const handleRegeneratePlanning = () => {
-    setGeneratedPlanning(null);
-    setShowPreview(false);
-    handleGeneratePlanning();
   };
 
   const getAllMatches = (planning: AIPlanning, selectedTournament: string, tournaments: TournamentDetail[]): Match[] => {
@@ -116,6 +95,82 @@ const PlanningPage = () => {
     return allMatches
   }
 
+  const handleGeneratePlanning = async () => {
+    if (!selectedTournament) return;
+      
+    setIsGenerating(true);
+    const response = await matchService.deleteMatchsFromAi(selectedTournament);
+    if (response.success) {
+      const response = await planningService.generatePlanning(selectedTournament);
+      if (response.success) {
+        const planningObj = response.data["planning_data"]
+        planningObj["total_matches"] = response.data["total_matches"]
+        setGeneratedPlanning(planningObj)
+        const extractedMatches = getAllMatches(planningObj, selectedTournament, tournaments);
+        setMatches(extractedMatches);
+        setIsGenerating(false);
+        setShowPreview(true);
+      } else {
+        console.error(response.message);
+      }
+    }
+  };
+
+  const handleRegeneratePlanning = () => {
+    setGeneratedPlanning(null);
+    setShowPreview(false);
+    handleGeneratePlanning();
+  };
+
+  const handleValidatePlanning = async () => {
+    if (!selectedTournament) return;
+
+    // Confirmation avant validation
+    const confirmed = window.confirm(
+      `Êtes-vous sûr de vouloir valider ce planning pour le tournoi ?\n\nCette action va :\n- Changer le statut du tournoi à "Prêt"\n- Créer automatiquement tous les matchs\n- Finaliser le planning\n\nCette action est irréversible.`
+    );
+
+    if (!confirmed) return;
+
+    setIsValidating(true);
+    let hasError = false;
+    let errorMessage = '';
+
+    try {
+      // 1. Changer le statut du tournoi à "ready"
+      try {
+        await tournamentService.updateTournamentStatus(selectedTournament, "ready");
+      } catch (error) {
+        console.error('Erreur lors du changement de statut:', error);
+        errorMessage += `Erreur changement de statut: ${error instanceof Error ? error.message : 'Erreur inconnue'}\n`;
+        hasError = true;
+      }
+      
+      // 2. Créer les matchs depuis l'IA
+      try {
+        await matchService.createMatchsFromAi(selectedTournament);
+      } catch (error) {
+        console.error('Erreur lors de la création des matchs:', error);
+        errorMessage += `Erreur création des matchs: ${error instanceof Error ? error.message : 'Erreur inconnue'}\n`;
+        hasError = true;
+      }
+      
+    } finally {
+      setIsValidating(false);
+      
+      // 3. Toujours rediriger vers la page de détail du tournoi
+      if (hasError) {
+        alert(`Validation partiellement réussie avec des erreurs :\n\n${errorMessage}\n\nVous êtes redirigé vers la page du tournoi pour vérifier l'état.`);
+      } else {
+        alert('Planning validé avec succès ! Redirection vers le tournoi...');
+      }
+      
+      navigate(`/tournaments/${selectedTournament}`);
+    }
+  };
+
+
+
   useEffect(() => {
     getTournaments()
   }, [])
@@ -160,9 +215,20 @@ const PlanningPage = () => {
                 </div>
                 <div className="flex gap-2">
                   <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleValidatePlanning}
+                    disabled={isValidating}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCircle className={`w-4 h-4 mr-1 ${isValidating ? 'animate-pulse' : ''}`} />
+                    {isValidating ? 'Validation...' : 'Valider le planning'}
+                  </Button>
+                  <Button
                     variant={viewMode === 'calendar' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setViewMode('calendar')}
+                    disabled={isValidating}
                   >
                     <Grid className="w-4 h-4 mr-1" />
                     Calendrier
@@ -171,6 +237,7 @@ const PlanningPage = () => {
                     variant={viewMode === 'table' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setViewMode('table')}
+                    disabled={isValidating}
                   >
                     <List className="w-4 h-4 mr-1" />
                     Liste

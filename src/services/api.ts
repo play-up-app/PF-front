@@ -385,6 +385,51 @@ export const teamsService = {
       console.error("Erreur lors de la suppression de l'équipe:", error.message);
       throw error;
     }
+  },
+
+  async importTeamsFromExcel(tournamentId: string, excelFile: File) {
+    try {
+      const formData = new FormData();
+      formData.append("excelFile", excelFile, excelFile.name);
+
+      const response = await fetch(`${TEAM_BASE_URL}/tournament/${tournamentId}/import-teams`, {
+        method: "POST",
+        body: formData,
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const result = await response.text();
+      return result;
+    } catch (error) {
+      console.error("Erreur lors de l'import des équipes depuis Excel:", error.message);
+      throw error;
+    }
+  },
+
+  async deleteAllTeamsFromTournament(tournamentId: string) {
+    try {
+      const response = await fetch(`${TEAM_BASE_URL}/tournament/${tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la suppression de toutes les équipes:", error.message);
+      throw error;
+    }
   }
 }; 
 
@@ -556,5 +601,49 @@ export const matchService = {
       console.error("Erreur lors de la récupération du match:", error.message);
       throw error;
     }
+  },
+
+  async createMatchsFromAi(tournamentId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/from-ai/tournament/${tournamentId}`, {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la création des matchs:", error.message);
+      throw error;
+    }
+  },
+
+  async deleteMatchsFromAi(tournamentId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/from-ai/tournament/${tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la suppression des matchs:", error.message);
+      throw error;
+    }
   }
-};
+}
