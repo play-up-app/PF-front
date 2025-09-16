@@ -44,6 +44,12 @@
     --tournament-success: 142 76% 36%;
     --tournament-warning: 38 92% 50%;
     --tournament-error: 0 84% 60%;
+
+    /* Match Status Colors */
+    --match-scheduled: 220 13% 91%;
+    --match-ready: 38 92% 50%;
+    --match-progress: 0 84% 60%;
+    --match-completed: 142 76% 36%;
   }
 
   .dark {
