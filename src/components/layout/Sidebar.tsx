@@ -25,7 +25,7 @@ const Sidebar = () => {
             <Trophy className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-xl font-semibold text-gray-900">
-            Tournoi Manager
+            Play UP
           </h1>
         </div>
         <Button

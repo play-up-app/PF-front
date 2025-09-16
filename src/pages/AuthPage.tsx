@@ -83,14 +83,15 @@ const AuthPage = () => {
         if (response) {
           toast({
             title: "Inscription réussie",
-            description: "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
+            description: "Votre compte a été créé avec succès. Vérifiez votre email pour activer votre compte.",
+            variant: "default"
           });
 
           // Basculer vers la connexion après inscription réussie
           setIsSignIn(true);
           setPassword('');
           setConfirmPassword('');
-          navigate('/auth');
+          navigate('/');
         } else {
           toast({
             title: "Erreur d'inscription",
@@ -119,7 +120,7 @@ const AuthPage = () => {
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">T</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Tournoi Manager</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Play Up</h1>
           </div>
           <p className="text-gray-600">
             {isSignIn ? 'Connectez-vous à votre compte' : 'Créez votre compte'}

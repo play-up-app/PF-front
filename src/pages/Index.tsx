@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useEffect, useState } from 'react';
 import { TournamentDetail } from '@/types/planning';
+import { tournamentService } from '@/services/api';
 // Icônes pour les statistiques
 const statsIcons = {
   'Tournois actifs': <Trophy className="w-6 h-6" />,
@@ -29,18 +30,10 @@ const Index = () => {
 
   const getTournaments = async () => {
     try {
-      (tournamentsUrl)
-      const response = await fetch(tournamentsUrl, {
-        method: "GET",
-        headers: {
-          "accept": "application/json",
-          "Content-Type": "application/json"
-        }
-      });
-      const responseJson = await response.json()
-      setTournaments(responseJson["data"])
+      const response = await tournamentService.getTournaments();
+      setTournaments(response["data"]["tournaments"]);
     } catch (error) {
-        console.error(error.message);
+      console.error(error.message);
     }
   }
 

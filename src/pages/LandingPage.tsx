@@ -17,7 +17,7 @@ const LandingPage = () => {
                 <Trophy className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-semibold text-gray-900">
-                Tournoi Manager
+                Play UP
               </h1>
             </div>
             <div className="flex items-center space-x-4">
@@ -162,7 +162,7 @@ const LandingPage = () => {
                   ))}
                 </div>
                 <p className="text-gray-600 mb-4">
-                  "Tournoi Manager a révolutionné notre façon d'organiser les tournois. 
+                  "Play UP a révolutionné notre façon d'organiser les tournois. 
                   L'IA pour les plannings nous fait gagner des heures !"
                 </p>
                 <div className="font-semibold">- Marie Dubois, Club de Volley Paris</div>
@@ -209,7 +209,7 @@ const LandingPage = () => {
             Prêt à commencer ?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Rejoignez des centaines d'organisateurs qui utilisent déjà Tournoi Manager
+            Rejoignez des centaines d'organisateurs qui utilisent déjà Play UP
           </p>
           <Link to="/">
             <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
@@ -229,7 +229,7 @@ const LandingPage = () => {
                 <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                   <Trophy className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">Tournoi Manager</h3>
+                <h3 className="text-xl font-semibold">Play UP</h3>
               </div>
               <p className="text-gray-400">
                 La solution complète pour gérer vos tournois de volley-ball.
@@ -266,7 +266,7 @@ const LandingPage = () => {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Tournoi Manager. Tous droits réservés.</p>
+            <p>&copy; 2024 Play UP. Tous droits réservés.</p>
           </div>
         </div>
       </footer>
