@@ -77,7 +77,7 @@ const TeamForm = ({ tournaments, onSubmit, onCancel, initialData, isLoading = fa
       newErrors.contactEmail = 'Format d\'email invalide';
     }
 
-          // Validation des membres
+      // Validation des membres
       const memberErrors: any[] = [];
       formData.members.forEach((member, index) => {
         const memberError: any = {};

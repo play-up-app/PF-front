@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { TournamentDetail } from '@/pages/TournamentsPage';
+import { tournamentService } from '@/services/api';
 
 interface TournamentStatusChangerProps {
   tournament: TournamentDetail;
@@ -28,17 +29,14 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
 
     setIsUpdating(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_BDD_SERVICE_URL}/tournaments/${tournament.id}/status/`, {
-        method: 'PATCH',
-        headers: {
-          'accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: selectedStatus })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
+      const response = await tournamentService.updateTournamentStatus(tournament.id, selectedStatus);
+      console.log("response", response);
+      if (!response.success) {
+        toast({
+          title: "Erreur",
+          description: response.message,
+          variant: "destructive",
+        });
       }
 
       onStatusChange(tournament.id, selectedStatus);
@@ -61,7 +59,7 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+      <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as "draft" | "ready" | "in_progress" | "completed" | "cancelled")}>
         <SelectTrigger className="w-32">
           <SelectValue />
         </SelectTrigger>
