@@ -11,35 +11,20 @@ import TableView from '@/components/planning/TableView';
 import LoadingState from '@/components/planning/LoadingState';
 import FeaturesInfo from '@/components/planning/FeaturesInfo';
 import { AIPlanning, TournamentDetail, Match } from '@/types/planning';
-
+import { tournamentService, planningService } from '@/services/api';
 
 const PlanningPage = () => {
-  const planningUrl = import.meta.env.VITE_PLANNING_SERVICE_URL
-  const bddUrl = import.meta.env.VITE_BDD_SERVICE_URL
-
   const [selectedTournament, setSelectedTournament] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPlanning, setGeneratedPlanning] = useState<AIPlanning | null>(null);
-  // const [generatedPlanning, setGeneratedPlanning] = useState(null)
   const [showPreview, setShowPreview] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [tournaments, setTournaments] = useState<TournamentDetail[]>([])
   const [matches, setMatches] = useState<Match[]>([])
 
   const getTournaments = async () => {
-    try {
-      const response = await fetch(`${bddUrl}/tournaments`, {
-        method: "GET",
-        headers: {
-          "accept": "application/json",
-          "Content-Type": "application/json"
-        }
-      });
-      const responseJson = await response.json()
-      setTournaments(responseJson["data"])
-    } catch (error) {
-        console.error(error.message);
-    }
+    const response = await tournamentService.getTournaments();
+    setTournaments(response["data"]["tournaments"]);
   }
 
   const calculateMatchDurationInMinutes = (startISO: string, endISO: string): number => {
@@ -55,33 +40,17 @@ const PlanningPage = () => {
     if (!selectedTournament) return;
     
     setIsGenerating(true);
-
-    try {
-      const response = await fetch(`${planningUrl}/planning/generate`, {
-        method: "POST",
-        headers: {
-          "accept": "application/json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({tournament_id: selectedTournament})
-      })
-      if (!response.ok) {
-        throw new Error(`Response status: ${response.status}`);
-      }
-      const json = await response.json();
-      const planningObj = json["data"]["planning_data"]
-      planningObj["total_matches"] = json["data"]["total_matches"]
-
+    const response = await planningService.generatePlanning(selectedTournament);
+    if (response.success) {
+      const planningObj = response.data["planning_data"]
+      planningObj["total_matches"] = response.data["total_matches"]
       setGeneratedPlanning(planningObj)
-      // Appeler getAllMatches avec le planning généré
-      const extractedMatches = getAllMatches(planningObj);
+      const extractedMatches = getAllMatches(planningObj, selectedTournament, tournaments);
       setMatches(extractedMatches);
-
       setIsGenerating(false);
       setShowPreview(true);
-    } catch (error) {
-        console.error(error.message);
-        setIsGenerating(false)
+    } else {
+      console.error(response.message);
     }
   };
 
@@ -91,14 +60,14 @@ const PlanningPage = () => {
     handleGeneratePlanning();
   };
 
-  const getAllMatches = (planning: AIPlanning): Match[] => {
+  const getAllMatches = (planning: AIPlanning, selectedTournament: string, tournaments: TournamentDetail[]): Match[] => {
     const allMatches: Match[] = [];
     // Extraire les matchs des poules
+    const duration = tournaments.find((tournament) => tournament.id === selectedTournament)?.match_duration_minutes
     if (planning.poules && Array.isArray(planning.poules)) {
       planning.poules.forEach((poule) => {
         if (poule.matchs && Array.isArray(poule.matchs)) {
           poule.matchs.forEach((match) => {
-            const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire)
             allMatches.push({
               ...match,
               phase: "poules",
@@ -116,8 +85,6 @@ const PlanningPage = () => {
       // Quarts de finale
       if (elimination.quarts && Array.isArray(elimination.quarts)) {
         elimination.quarts.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire)
-
           allMatches.push({
             ...match,
             phase: "quart",
@@ -129,7 +96,6 @@ const PlanningPage = () => {
       // Demi-finales
       if (elimination.demi_finales && Array.isArray(elimination.demi_finales)) {
         elimination.demi_finales.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire)
           allMatches.push({
             ...match,
             phase: "demi",
@@ -140,10 +106,6 @@ const PlanningPage = () => {
       
       // Finale
       if (elimination.finale) {
-        const duration = calculateMatchDurationInMinutes(
-          elimination.finale.debut_horaire, 
-          elimination.finale.fin_horaire
-        )
         allMatches.push({
           ...elimination.finale,
           phase: "finale", 

@@ -11,13 +11,11 @@ import CalendarView from '@/components/planning/CalendarView';
 import TableView from '@/components/planning/TableView';
 import { TournamentDetail } from '@/pages/TournamentsPage';
 import { Match, AIPlanning, Team } from '@/types/planning';
-import { tournamentService } from '@/services/api';
-
+import { tournamentService, planningService } from '@/services/api';
+import LiveMatchDashboard from '@/components/matches/LiveMatchDashboard';
 
 const TournamentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const bddUrl = import.meta.env.VITE_BDD_SERVICE_URL;
-  const planningUrl = import.meta.env.VITE_PLANNING_SERVICE_URL;
   const [tournament, setTournament] = useState<TournamentDetail | null>(null);
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -25,7 +23,8 @@ const TournamentDetailPage = () => {
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [loading, setLoading] = useState(true);
   const [loadingPlanning, setLoadingPlanning] = useState(false);
-
+  const [loadingTeamsWithMembers, setLoadingTeamsWithMembers] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   // Fonction utilitaire pour calculer la durée d'un match en minutes
   const calculateMatchDurationInMinutes = (startISO: string, endISO: string): number => {
     const startDate = new Date(startISO);
@@ -45,11 +44,10 @@ const TournamentDetailPage = () => {
       planning.poules.forEach((poule) => {
         if (poule.matchs && Array.isArray(poule.matchs)) {
           poule.matchs.forEach((match) => {
-            const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
             allMatches.push({
               ...match,
               phase: "poules",
-              duration: duration
+              duration: tournament.match_duration_minutes
             });
           });
         }
@@ -63,11 +61,10 @@ const TournamentDetailPage = () => {
       // Quarts de finale
       if (elimination.quarts && Array.isArray(elimination.quarts)) {
         elimination.quarts.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
           allMatches.push({
             ...match,
             phase: "quart",
-            duration: duration
+            duration: tournament.match_duration_minutes
           });
         });
       }
@@ -75,25 +72,20 @@ const TournamentDetailPage = () => {
       // Demi-finales
       if (elimination.demi_finales && Array.isArray(elimination.demi_finales)) {
         elimination.demi_finales.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
           allMatches.push({
             ...match,
             phase: "demi",
-            duration: duration  
+            duration: tournament.match_duration_minutes
           });
         });
       }
       
       // Finale
       if (elimination.finale) {
-        const duration = calculateMatchDurationInMinutes(
-          elimination.finale.debut_horaire, 
-          elimination.finale.fin_horaire
-        );
         allMatches.push({
           ...elimination.finale,
           phase: "finale", 
-          duration: duration
+          duration: tournament.match_duration_minutes
         });
       }
     }
@@ -106,19 +98,14 @@ const TournamentDetailPage = () => {
     
     setLoadingPlanning(true);
     try {
-      const response = await fetch(`${planningUrl}/planning/tournament/${tournamentId}`, {
-        method: "GET",
-        headers: {
-          "accept": "application/json",
-          "Content-Type": "application/json"
-        }
-      });
+      const response = await planningService.getPlanningByTournament(tournamentId);
+      console.log(response);
 
-      if (response.ok) {
-        const planningData = await response.json();
-        if (planningData && planningData.data && planningData.data.planning_data) {
-          const planningObj = planningData.data.planning_data;
-          planningObj.total_matches = planningData.data.total_matches;
+      if (response.success) {
+        const planningData = response.data;
+        if (planningData) {
+          const planningObj = planningData.planning_data;
+          planningObj.total_matches = planningData.total_matches;
           
           setGeneratedPlanning(planningObj);
           const extractedMatches = getAllMatches(planningObj);
@@ -279,9 +266,7 @@ const TournamentDetailPage = () => {
                     }
                   </p>
                   <p className="text-sm text-gray-500">
-                    {tournament.start_time ? 
-                      tournament.start_time.slice(0, 5) : '-'
-                    }
+                    {tournament.start_time? new Date(tournament.start_time).toISOString().slice(11, 16) : '-'}
                   </p>
                 </div>
               </div>
@@ -332,6 +317,7 @@ const TournamentDetailPage = () => {
           <TabsList>
             <TabsTrigger value="planning">Planning</TabsTrigger>
             <TabsTrigger value="teams">Équipes</TabsTrigger>
+            <TabsTrigger value="matches">Matchs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="planning" className="space-y-6">
@@ -406,13 +392,28 @@ const TournamentDetailPage = () => {
           <TabsContent value="teams" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  Équipes participantes
-                </CardTitle>
-                <p className="text-sm text-gray-600">
-                  {teams.length} équipes inscrites
-                </p>
+                <div className= "flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      Équipes participantes
+                    </CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {teams.length} équipes inscrites
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => tournamentService.updateRegisteredTeamsCount(id!)}
+                        disabled={loadingTeamsWithMembers}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${loadingTeamsWithMembers ? 'animate-spin' : ''}`} />
+                        Actualiser
+                      </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {teams.length > 0 ? (
@@ -467,6 +468,10 @@ const TournamentDetailPage = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="matches" className="space-y-6">
+            <LiveMatchDashboard tournamentId={id!} />
           </TabsContent>
         </Tabs>
       </div>
