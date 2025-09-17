@@ -3,21 +3,17 @@ import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { TournamentDetail } from '@/pages/TournamentsPage';
-import { tournamentService } from '@/services/api';
+import { Match } from '@/types/planning';
+import { matchService } from '@/services/api';
 
-interface TournamentStatusChangerProps {
-  tournament: TournamentDetail;
-  onStatusChange: (tournamentId: string, newStatus: string) => void;
-}
 
-const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatusChangerProps) => {
-  const [selectedStatus, setSelectedStatus] = useState(tournament.status);
+const MatchStatusChanger = ({match, onStatusChange}: {match: Match, onStatusChange: (matchId: string, newStatus: string) => void}) => {
+  const [selectedStatus, setSelectedStatus] = useState(match.status);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
   const statusOptions = [
-    { value: 'draft', label: 'Brouillon' },
+    { value: 'scheduled', label: 'Programmé' },
     { value: 'ready', label: 'Prêt' },
     { value: 'in_progress', label: 'En cours' },
     { value: 'completed', label: 'Terminé' },
@@ -25,11 +21,11 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
   ];
 
   const handleStatusUpdate = async () => {
-    if (selectedStatus === tournament.status) return;
+    if (selectedStatus === match.status) return;
 
     setIsUpdating(true);
     try {
-      const response = await tournamentService.updateTournamentStatus(tournament.id, selectedStatus);
+      const response = await matchService.updateMatchStatus(match.id, selectedStatus);
       console.log("response", response);
       if (!response.success) {
         toast({
@@ -38,11 +34,10 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
           variant: "destructive",
         });
       }
-
-      onStatusChange(tournament.id, selectedStatus);
+      onStatusChange(match.id, selectedStatus);
       toast({
         title: "Statut mis à jour",
-        description: `Le statut du tournoi a été changé vers "${statusOptions.find(opt => opt.value === selectedStatus)?.label}".`,
+        description: `Le statut du match a été changé vers "${statusOptions.find(opt => opt.value === selectedStatus)?.label}".`,
       });
     } catch (error) {
       console.error('Error updating tournament status:', error);
@@ -51,7 +46,7 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
         description: "Impossible de mettre à jour le statut du tournoi.",
         variant: "destructive",
       });
-      setSelectedStatus(tournament.status); // Reset to original status
+      setSelectedStatus(match.status); // Reset to original status
     } finally {
       setIsUpdating(false);
     }
@@ -59,7 +54,7 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
 
   return (
     <div className="flex items-center gap-2">
-      <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as "draft" | "ready" | "in_progress" | "completed" | "cancelled")}>
+      <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as "scheduled" | "ready" | "in_progress" | "completed" | "cancelled")}>
         <SelectTrigger className="w-32">
           <SelectValue />
         </SelectTrigger>
@@ -72,7 +67,7 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
         </SelectContent>
       </Select>
       
-      {selectedStatus !== tournament.status && (
+      {selectedStatus !== match.status && (
         <Button
           size="sm"
           onClick={handleStatusUpdate}
@@ -85,4 +80,4 @@ const TournamentStatusChanger = ({ tournament, onStatusChange }: TournamentStatu
   );
 };
 
-export default TournamentStatusChanger;
+export default MatchStatusChanger;

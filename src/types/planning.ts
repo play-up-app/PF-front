@@ -8,7 +8,7 @@ export interface Tournament {
   start_time: string;
 }
 
-export interface Match {
+export interface MatchIA {
   terrain: number;
   equipe_a: string;
   equipe_b: string;
@@ -16,6 +16,49 @@ export interface Match {
   debut_horaire: string;
   fin_horaire: string;
   phase: string
+}
+
+
+export interface Match {
+  id: string;
+  tournament_id: string;
+  team_a_id: string;
+  team_b_id: string;
+  court_number: number;
+  schedule_time: string;
+  actual_start_time: string;
+  actual_end_time: string;
+  duration?: number;
+  status: 'scheduled' | 'ready' | 'in_progress' | 'completed' | 'cancelled';
+  team_a_score: number;
+  team_b_score: number;
+  winner_team_id: string;
+  phase: string
+  round_number: string;
+  match_number_in_round: string;
+  sets_data: Array<{set_number: number, team_a: number, team_b: number}>;
+  referee_id: string;
+  current_set: number;
+  current_set_score: {
+    team_a: number;
+    team_b: number;
+  };
+  metadata: {
+    ai_match_id: string;
+    poule_id: string;
+    original_team_names: {
+      team_a: string;
+      team_b: string;
+    };
+  };
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  last_modified_by: string;
+  source_ai_match_id: string;
+  created_from_ai: boolean;
+  last_score_update_at: string;
+  last_score_update_by: string;
 }
 
 export interface TournamentDetail {
@@ -94,3 +137,21 @@ export interface Team {
   members: Member[];
 }
 
+export interface NewTournament {
+  id: string;
+  name: string;
+  description: string;
+  tournament_type: 'poules_elimination' | 'round_robin' | 'elimination_directe' | 'double_elimination';
+  start_date: string;
+  start_time: string;
+  max_teams: number;
+  match_duration_minutes: number;
+  break_duration_minutes: number;
+  courts_available: number;
+  status: 'draft' | 'ready' | 'in_progress' | 'completed' | 'cancelled';
+  organizer_id: string;
+  constraints: object;
+  created_at: string;
+  updated_at: string;
+  registered_teams: number;
+}

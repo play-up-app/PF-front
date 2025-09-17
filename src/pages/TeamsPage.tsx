@@ -34,8 +34,8 @@ const TeamsPage = () => {
   const handleGetTournaments = async () => {
     setIsLoadingTournaments(true);
     try {
-      const data = await tournamentService.getTournaments();
-      setTournaments(data["tournaments"]);
+      const response = await tournamentService.getTournaments();
+      setTournaments(response["data"]["tournaments"]);
     } catch (error) {
       console.error("Erreur lors du chargement des tournois:", error.message);
     } finally {

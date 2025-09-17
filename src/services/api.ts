@@ -1,9 +1,12 @@
+import { NewTournament } from '@/types/planning';
+
 const BDD_BASE_URL = import.meta.env.VITE_BDD_SERVICE_URL;
 const PLANNING_BASE_URL = import.meta.env.VITE_PLANNING_SERVICE_URL;
 const TEAM_BASE_URL = import.meta.env.VITE_TEAM_SERVICE_URL;
 
 const TOURNAMENT_BASE_URL = import.meta.env.VITE_TOURNAMENT_SERVICE_URL;
 const AUTH_BASE_URL = import.meta.env.VITE_AUTH_SERVICE_URL_NEW;
+const MATCH_BASE_URL = import.meta.env.VITE_MATCH_SERVICE_URL;
 // Types pour les réponses API
 interface ApiResponse<T> {
     success: boolean;
@@ -28,7 +31,7 @@ export const tournamentService = {
       }
 
       const responseJson: ApiResponse<any[]> = await response.json();
-      return responseJson.data;
+      return responseJson;
     } catch (error) {
       console.error("Erreur lors de la récupération des tournois:", error.message);
       throw error;
@@ -55,8 +58,8 @@ export const tournamentService = {
         throw new Error(`Response status: ${response.status}`);
       }
 
-      const responseJson: ApiResponse<any[]> = await response.json();
-      return responseJson.data;
+      const responseJson: ApiResponse<NewTournament> = await response.json();
+      return responseJson;
     } catch (error) {
       console.error("Erreur lors de la création du tournoi:", error.message);
       throw error;
@@ -105,6 +108,81 @@ export const tournamentService = {
       console.error("Erreur lors de la récupération des équipes:", error.message);
       throw error;
     }
+  },
+
+  async updateTournamentStatus(tournamentId: string, status: string) {
+    try {
+      let response;
+      switch (status) {
+        case "ready":
+          response = await fetch(`${TOURNAMENT_BASE_URL}/${tournamentId}/publish`, {
+            method: "PATCH",
+            headers: {
+              "accept": "application/json",
+              "Content-Type": "application/json"
+            }
+          });
+          break;
+        case "draft":
+          response = await fetch(`${TOURNAMENT_BASE_URL}/${tournamentId}/draft`, {
+            method: "PATCH",
+            headers: {
+              "accept": "application/json",
+              "Content-Type": "application/json"
+            }
+          });
+          break;
+        case "in_progress":
+          response = await fetch(`${TOURNAMENT_BASE_URL}/${tournamentId}/start`, {
+            method: "PATCH",
+            headers: {
+              "accept": "application/json",
+              "Content-Type": "application/json"
+            }
+          });
+          break;
+        case "completed":
+          response = await fetch(`${TOURNAMENT_BASE_URL}/${tournamentId}/finish`, {
+            method: "PATCH",
+            headers: {
+              "accept": "application/json",
+              "Content-Type": "application/json"
+            }
+          });
+          break;
+      }
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      const responseJson: ApiResponse<any> = await response.json();
+
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du statut du tournoi:", error.message);
+      throw error;
+    }
+  },
+
+  async updateRegisteredTeamsCount(tournamentId: string) {
+    try {
+      const response = await fetch(`${TOURNAMENT_BASE_URL}/${tournamentId}/update-registered-teams-count`, {
+        method: "PATCH",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du compteur d'équipes inscrites:", error.message);
+      throw error;
+    }
   }
 };
 
@@ -125,7 +203,7 @@ export const planningService = {
       }
 
       const responseJson: ApiResponse<any> = await response.json();
-      return responseJson.data;
+      return responseJson;
     } catch (error) {
       console.error("Erreur lors de la récupération du planning:", error.message);
       throw error;
@@ -148,7 +226,7 @@ export const planningService = {
       }
 
       const responseJson: ApiResponse<any> = await response.json();
-      return responseJson.data;
+      return responseJson;
     } catch (error) {
       console.error("Erreur lors de la génération du planning:", error.message);
       throw error;
@@ -307,6 +385,51 @@ export const teamsService = {
       console.error("Erreur lors de la suppression de l'équipe:", error.message);
       throw error;
     }
+  },
+
+  async importTeamsFromExcel(tournamentId: string, excelFile: File) {
+    try {
+      const formData = new FormData();
+      formData.append("excelFile", excelFile, excelFile.name);
+
+      const response = await fetch(`${TEAM_BASE_URL}/tournament/${tournamentId}/import-teams`, {
+        method: "POST",
+        body: formData,
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const result = await response.text();
+      return result;
+    } catch (error) {
+      console.error("Erreur lors de l'import des équipes depuis Excel:", error.message);
+      throw error;
+    }
+  },
+
+  async deleteAllTeamsFromTournament(tournamentId: string) {
+    try {
+      const response = await fetch(`${TEAM_BASE_URL}/tournament/${tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la suppression de toutes les équipes:", error.message);
+      throw error;
+    }
   }
 }; 
 
@@ -408,3 +531,119 @@ export const authService = {
   }
   
 };
+
+
+// service pour les matchs 
+export const matchService = {
+  async getMatchsByTournamentId(tournamentId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/tournament/${tournamentId}`, {
+        method: "GET",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson.data;
+    } catch (error) {
+      console.error("Erreur lors de la récupération des matchs:", error.message);
+      throw error;
+    }
+  },
+
+  async updateMatchStatus(matchId: string, status: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/${matchId}/status`, {
+        method: "PATCH",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson.data;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du statut du match:", error.message);
+      throw error;
+    }
+  },
+
+  async getMatchById(matchId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/${matchId}`, {
+        method: "GET",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+  
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson.data;
+    } catch (error) {
+      console.error("Erreur lors de la récupération du match:", error.message);
+      throw error;
+    }
+  },
+
+  async createMatchsFromAi(tournamentId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/from-ai/tournament/${tournamentId}`, {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la création des matchs:", error.message);
+      throw error;
+    }
+  },
+
+  async deleteMatchsFromAi(tournamentId: string) {
+    try {
+      const response = await fetch(`${MATCH_BASE_URL}/from-ai/tournament/${tournamentId}`, {
+        method: "DELETE",
+        headers: {
+          "accept": "application/json",
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      const responseJson: ApiResponse<any> = await response.json();
+      return responseJson;
+    } catch (error) {
+      console.error("Erreur lors de la suppression des matchs:", error.message);
+      throw error;
+    }
+  }
+}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, Users, Clock, MapPin, Trophy, Grid, List, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, Clock, MapPin, Trophy, Grid, List, RefreshCw, Upload, Trash2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,13 +11,11 @@ import CalendarView from '@/components/planning/CalendarView';
 import TableView from '@/components/planning/TableView';
 import { TournamentDetail } from '@/pages/TournamentsPage';
 import { Match, AIPlanning, Team } from '@/types/planning';
-import { tournamentService } from '@/services/api';
-
+import { tournamentService, planningService, teamsService } from '@/services/api';
+import LiveMatchDashboard from '@/components/matches/LiveMatchDashboard';
 
 const TournamentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const bddUrl = import.meta.env.VITE_BDD_SERVICE_URL;
-  const planningUrl = import.meta.env.VITE_PLANNING_SERVICE_URL;
   const [tournament, setTournament] = useState<TournamentDetail | null>(null);
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -25,7 +23,13 @@ const TournamentDetailPage = () => {
   const [viewMode, setViewMode] = useState<'calendar' | 'table'>('calendar');
   const [loading, setLoading] = useState(true);
   const [loadingPlanning, setLoadingPlanning] = useState(false);
-
+  const [loadingTeamsWithMembers, setLoadingTeamsWithMembers] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [importingExcel, setImportingExcel] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [deletingAllTeams, setDeletingAllTeams] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Fonction utilitaire pour calculer la durée d'un match en minutes
   const calculateMatchDurationInMinutes = (startISO: string, endISO: string): number => {
     const startDate = new Date(startISO);
@@ -37,19 +41,19 @@ const TournamentDetailPage = () => {
   };
 
   // Fonction pour extraire tous les matchs du planning
-  const getAllMatches = (planning: AIPlanning): Match[] => {
+  const getAllMatches = (planning: AIPlanning, tournamentData: TournamentDetail | null): Match[] => {
     const allMatches: Match[] = [];
+    const matchDuration = tournamentData?.match_duration_minutes || 0;
     
     // Extraire les matchs des poules
     if (planning.poules && Array.isArray(planning.poules)) {
       planning.poules.forEach((poule) => {
         if (poule.matchs && Array.isArray(poule.matchs)) {
           poule.matchs.forEach((match) => {
-            const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
             allMatches.push({
               ...match,
               phase: "poules",
-              duration: duration
+              duration: matchDuration
             });
           });
         }
@@ -63,11 +67,10 @@ const TournamentDetailPage = () => {
       // Quarts de finale
       if (elimination.quarts && Array.isArray(elimination.quarts)) {
         elimination.quarts.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
           allMatches.push({
             ...match,
             phase: "quart",
-            duration: duration
+            duration: matchDuration
           });
         });
       }
@@ -75,25 +78,20 @@ const TournamentDetailPage = () => {
       // Demi-finales
       if (elimination.demi_finales && Array.isArray(elimination.demi_finales)) {
         elimination.demi_finales.forEach((match) => {
-          const duration = calculateMatchDurationInMinutes(match.debut_horaire, match.fin_horaire);
           allMatches.push({
             ...match,
             phase: "demi",
-            duration: duration  
+            duration: matchDuration
           });
         });
       }
       
       // Finale
       if (elimination.finale) {
-        const duration = calculateMatchDurationInMinutes(
-          elimination.finale.debut_horaire, 
-          elimination.finale.fin_horaire
-        );
         allMatches.push({
           ...elimination.finale,
           phase: "finale", 
-          duration: duration
+          duration: matchDuration
         });
       }
     }
@@ -101,27 +99,22 @@ const TournamentDetailPage = () => {
   };
 
   // Fonction pour charger le planning du tournoi
-  const loadPlanningForTournament = async (tournamentId: string) => {
+  const loadPlanningForTournament = async (tournamentId: string, tournamentData?: TournamentDetail | null) => {
     if (!tournamentId) return;
     
     setLoadingPlanning(true);
     try {
-      const response = await fetch(`${planningUrl}/planning/tournament/${tournamentId}`, {
-        method: "GET",
-        headers: {
-          "accept": "application/json",
-          "Content-Type": "application/json"
-        }
-      });
+      const response = await planningService.getPlanningByTournament(tournamentId);
+      console.log(response);
 
-      if (response.ok) {
-        const planningData = await response.json();
-        if (planningData && planningData.data && planningData.data.planning_data) {
-          const planningObj = planningData.data.planning_data;
-          planningObj.total_matches = planningData.data.total_matches;
+      if (response.success) {
+        const planningData = response.data;
+        if (planningData) {
+          const planningObj = planningData.planning_data;
+          planningObj.total_matches = planningData.total_matches;
           
           setGeneratedPlanning(planningObj);
-          const extractedMatches = getAllMatches(planningObj);
+          const extractedMatches = getAllMatches(planningObj, tournamentData || tournament);
           setMatches(extractedMatches);
         } else {
           setGeneratedPlanning(null);
@@ -140,13 +133,16 @@ const TournamentDetailPage = () => {
     }
   };
 
-  const fetchTournament = async () => {
+  const fetchTournament = async (id: string) => {
     try {
       const response = await tournamentService.getTournamentById(id);
-      setTournament(response["data"]);
+      setTournament(response.data);
+      return response.data;
     } catch (error) {
       console.error('Error fetching tournament:', error);
+      return null;
     } finally {
+      console.log("fetch tournament finally")
       setLoading(false);
     }
   };
@@ -162,12 +158,102 @@ const TournamentDetailPage = () => {
     }
   };
 
+  // Fonction pour gérer l'import Excel
+  const handleImportExcel = async () => {
+    if (!fileInputRef.current?.files?.[0]) {
+      setImportMessage("Veuillez sélectionner un fichier Excel");
+      // Supprimer le message après 2 secondes
+      setTimeout(() => setImportMessage(null), 2000);
+      return;
+    }
+
+    const file = fileInputRef.current.files[0];
+    if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+      setImportMessage("Veuillez sélectionner un fichier Excel (.xlsx ou .xls)");
+      // Supprimer le message après 2 secondes
+      setTimeout(() => setImportMessage(null), 2000);
+      return;
+    }
+
+    setImportingExcel(true);
+    setImportMessage(null);
+
+    try {
+      const result = await teamsService.importTeamsFromExcel(id!, file);
+      setImportMessage(`Import réussi : ${result}`);
+      
+      // Recharger les équipes après l'import
+      await fetchTeams(id!);
+      
+      // Réinitialiser l'input file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      // Supprimer le message de succès après 2 secondes
+      setTimeout(() => setImportMessage(null), 2000);
+    } catch (error) {
+      console.error('Erreur lors de l\'import:', error);
+      setImportMessage(`Erreur lors de l'import : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      // Supprimer le message d'erreur après 2 secondes
+      setTimeout(() => setImportMessage(null), 2000);
+    } finally {
+      setImportingExcel(false);
+    }
+  };
+
+  // Fonction pour déclencher la sélection de fichier
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Fonction pour supprimer toutes les équipes
+  const handleDeleteAllTeams = async () => {
+    if (!id) return;
+
+    // Confirmation avant suppression
+    const confirmed = window.confirm(
+      `Êtes-vous sûr de vouloir supprimer toutes les équipes du tournoi "${tournament?.name}" ?\n\nCette action est irréversible et supprimera également tous les membres des équipes.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingAllTeams(true);
+    setDeleteMessage(null);
+
+    try {
+      const result = await teamsService.deleteAllTeamsFromTournament(id);
+      
+      if (result.success) {
+        setDeleteMessage(`Suppression réussie : ${result.message}`);
+        // Recharger les équipes après suppression
+        await fetchTeams(id);
+        // Supprimer le message après 3 secondes
+        setTimeout(() => setDeleteMessage(null), 3000);
+      } else {
+        setDeleteMessage(`Erreur lors de la suppression : ${result.message}`);
+        // Supprimer le message après 3 secondes
+        setTimeout(() => setDeleteMessage(null), 3000);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression de toutes les équipes:', error);
+      setDeleteMessage(`Erreur lors de la suppression : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      // Supprimer le message après 3 secondes
+      setTimeout(() => setDeleteMessage(null), 3000);
+    } finally {
+      setDeletingAllTeams(false);
+    }
+  };
+
   useEffect(() => {
     if (id) {
-      fetchTournament();
-      fetchTeams(id);
-      // Charger le planning pour ce tournoi
-      loadPlanningForTournament(id);
+      const loadData = async () => {
+        const tournamentData = await fetchTournament(id);
+        await fetchTeams(id);
+        // Charger le planning après que le tournoi soit chargé
+        await loadPlanningForTournament(id, tournamentData);
+      };
+      loadData();
     }
   }, [id]);
 
@@ -279,9 +365,7 @@ const TournamentDetailPage = () => {
                     }
                   </p>
                   <p className="text-sm text-gray-500">
-                    {tournament.start_time ? 
-                      tournament.start_time.slice(0, 5) : '-'
-                    }
+                    {tournament.start_time? new Date(tournament.start_time).toISOString().slice(11, 16) : '-'}
                   </p>
                 </div>
               </div>
@@ -332,6 +416,7 @@ const TournamentDetailPage = () => {
           <TabsList>
             <TabsTrigger value="planning">Planning</TabsTrigger>
             <TabsTrigger value="teams">Équipes</TabsTrigger>
+            <TabsTrigger value="matches">Matchs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="planning" className="space-y-6">
@@ -406,15 +491,97 @@ const TournamentDetailPage = () => {
           <TabsContent value="teams" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  Équipes participantes
-                </CardTitle>
-                <p className="text-sm text-gray-600">
-                  {teams.length} équipes inscrites
-                </p>
+                <div className= "flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      Équipes participantes
+                    </CardTitle>
+                    <p className="text-sm text-gray-600">
+                      {teams.length} équipes inscrites
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFileSelect}
+                      disabled={importingExcel || deletingAllTeams}
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Importer Excel
+                    </Button>
+                    {teams.length > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDeleteAllTeams}
+                        disabled={deletingAllTeams || importingExcel}
+                      >
+                        <Trash2 className={`w-4 h-4 mr-1 ${deletingAllTeams ? 'animate-pulse' : ''}`} />
+                        Supprimer toutes
+                      </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => tournamentService.updateRegisteredTeamsCount(id!)}
+                        disabled={loadingTeamsWithMembers || deletingAllTeams}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-1 ${loadingTeamsWithMembers ? 'animate-spin' : ''}`} />
+                        Actualiser
+                      </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
+                {/* Input file caché pour l'import Excel */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style={{ display: 'none' }}
+                  onChange={handleImportExcel}
+                />
+                
+                {/* Messages d'import */}
+                {importMessage && (
+                  <div className={`mb-4 p-3 rounded-md text-sm ${
+                    importMessage.includes('réussi') 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {importMessage}
+                  </div>
+                )}
+
+                {/* Messages de suppression */}
+                {deleteMessage && (
+                  <div className={`mb-4 p-3 rounded-md text-sm ${
+                    deleteMessage.includes('réussi') 
+                      ? 'bg-green-50 text-green-700 border border-green-200' 
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    {deleteMessage}
+                  </div>
+                )}
+
+                {/* Indicateur de chargement pour l'import */}
+                {importingExcel && (
+                  <div className="mb-4 p-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Import en cours...
+                  </div>
+                )}
+
+                {/* Indicateur de chargement pour la suppression */}
+                {deletingAllTeams && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
+                    Suppression en cours...
+                  </div>
+                )}
+
                 {teams.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {teams.map((team) => (
@@ -467,6 +634,10 @@ const TournamentDetailPage = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="matches" className="space-y-6">
+            <LiveMatchDashboard tournamentId={id!} />
           </TabsContent>
         </Tabs>
       </div>

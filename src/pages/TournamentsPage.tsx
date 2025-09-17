@@ -37,7 +37,6 @@ export interface TournamentDetail {
 
 
 const TournamentsPage = () => {
-  const url = `${import.meta.env.VITE_BDD_SERVICE_URL}/tournaments`
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -79,17 +78,7 @@ const TournamentsPage = () => {
   const getTournaments = async () => {
     try {
       const response = await tournamentService.getTournaments();
-      console.log("response", response["tournaments"]);
-      setTournaments(response["tournaments"]);
-      // const response = await fetch(url, {
-      //   method: "GET",
-      //   headers: {
-      //     "accept": "application/json",
-      //     "Content-Type": "application/json"
-      //   }
-      // });
-      // const responseJson = await response.json()
-      // setTournaments(responseJson["data"])
+      setTournaments(response["data"]["tournaments"]);
     } catch (error) {
         console.error(error.message);
     }

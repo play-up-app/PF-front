@@ -9,6 +9,29 @@ interface TournamentSelectorProps {
   onTournamentChange: (value: string) => void;
 }
 
+const getStatusInfo = {
+  'draft': {
+    color: 'bg-gray-100 text-gray-700',
+    label: 'Brouillon'
+  },
+  'ready': {
+    color: 'bg-blue-100 text-blue-700',
+    label: 'Prêt'
+  },
+  'in_progress': {
+    color: 'bg-green-100 text-green-700',
+    label: 'En cours'
+  },
+  'completed': {
+    color: 'bg-purple-100 text-purple-700',
+    label: 'Terminé'
+  },
+  'cancelled': {
+    color: 'bg-red-100 text-red-700',
+    label: 'Annulé'
+  }
+}
+
 const TournamentSelector = ({ tournaments, selectedTournament, onTournamentChange }: TournamentSelectorProps) => {
   const selectedTournamentData = tournaments.find(t => t.id === selectedTournament);
 
@@ -34,12 +57,9 @@ const TournamentSelector = ({ tournaments, selectedTournament, onTournamentChang
                 <SelectItem key={tournament.id} value={tournament.id}>
                   <div className="flex items-center justify-between w-full">
                     <span>{tournament.name}</span>
-                    <span className={`ml-2 px-2 py-1 rounded-md text-xs ${
-                      tournament.status === 'ready' 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-yellow-100 text-yellow-700'
+                    <span className={`ml-2 px-2 py-1 rounded-md text-xs ${getStatusInfo[tournament.status].color}
                     }`}>
-                      {tournament.status === 'ready' ? 'Prêt' : 'Brouillon'}
+                      {getStatusInfo[tournament.status].label}
                     </span>
                   </div>
                 </SelectItem>
@@ -62,11 +82,15 @@ const TournamentSelector = ({ tournaments, selectedTournament, onTournamentChang
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-600">{selectedTournamentData.start_date}</span>
+                <span className="text-sm text-gray-600">{selectedTournamentData.start_date ? new Date(selectedTournamentData.start_date).toLocaleDateString('fr-FR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
+                }) : '-'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-600">{selectedTournamentData.start_time}</span>
+                <span className="text-sm text-gray-600">{selectedTournamentData.start_time ? new Date(selectedTournamentData.start_time).toISOString().slice(11, 16) : '-'}</span>
               </div>
             </div>
           </div>

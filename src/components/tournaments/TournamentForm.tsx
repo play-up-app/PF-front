@@ -97,31 +97,21 @@ const TournamentForm = () => {
 
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) {
-      tournamentService.createTournament(formData);
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Tournoi créé avec succès!",
-        description: `Le tournoi "${formData.name}" a été créé.`,
-      });
-      
-      // Navigate to tournament detail
-      navigate('/tournaments/1');
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors de la création du tournoi.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
+      const response = await tournamentService.createTournament(formData);
+      console.log(response);
+      if (response.success) {
+        toast({
+          title: "Tournoi créé avec succès!",
+          description: `Le tournoi "${formData.name}" a été créé.`,
+        });
+        navigate(`/tournaments/${response.data.id}`);
+      } else {
+          toast({
+            title: "Erreur",
+            description: response.message,
+            variant: "destructive",
+          });
+      }
     }
   };
 
